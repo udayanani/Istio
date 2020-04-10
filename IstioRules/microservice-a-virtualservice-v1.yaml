@@ -1,0 +1,19 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: microservice-a
+spec:
+  hosts:
+  - "*"
+  gateways:
+  - microservice-gateway
+ http:
+  - match:
+    - uri:
+        prefix: /microservice-a
+    rewrite:
+      uri: /
+    route:
+    - destination:
+        host: microservice-a
+        subset: v1
