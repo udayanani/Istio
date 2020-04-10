@@ -1,0 +1,16 @@
+# Destination Rules are the policies, apply to traffic after Virtual-Service Routing takes place. But they need to be configured before virtual services. It depends on the
+# number of deployments a Microservice has...
+
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: microservice-b
+spec:
+  host: microservice-b
+  subsets:
+  - name: v1
+    labels:
+      version: "1.0"
+  - name: v2
+    labels:
+      version: "2.0"
