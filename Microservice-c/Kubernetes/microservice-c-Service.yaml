@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: microservice-c
+  labels:
+    app: microservice-c
+spec:
+  ports:
+  - port: 80
+    targetPort: 8080
+    name: http
+  selector:
+    app: microservice-c

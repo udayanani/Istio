@@ -1,0 +1,22 @@
+# We can inject delays into the request as
+
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: microservice-c
+spec:
+  hosts:
+  - microservice-c
+  gateways:
+  - microservice-gateway
+  http:
+  - match:
+    - uri:
+        prefix: /
+    route:
+    - destination:
+        host: microservice-c
+    fault:
+      delay:
+        percent: 100
+        fixedDelay: 5s

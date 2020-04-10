@@ -1,0 +1,22 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: microservice-c-deployment-v1
+  labels:
+    app: microservice-c
+    version: "1.0"
+spec:
+  replicas: 1
+  template: # template for the pods
+    metadata:
+      labels:
+        app: microservice-c
+        version: "1.0"
+    spec:
+      containers:
+      - name: microservice-c
+        image: microservice-c:1.0
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+        
