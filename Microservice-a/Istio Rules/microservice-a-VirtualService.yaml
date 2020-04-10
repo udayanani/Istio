@@ -1,0 +1,20 @@
+# Binding the Mainservice to the ingress gateway
+ 
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: microservice-a
+spec:
+  hosts:
+  - "*"
+  gateways:
+  - microservice-gateway
+  http:
+  - match:
+    - uri:
+        prefix: /microservice-a   # The main service that gets traffic from ingress gateway
+    rewrite:
+      uri: /                      # Rewriting the main URI.. This endpoint value depends on the user
+    route:
+    - destination:
+        host: microservice-a.default.svc.cluster.local    # Based on matching URI, the control goes to the required service of the main Microservice, default is the namespace

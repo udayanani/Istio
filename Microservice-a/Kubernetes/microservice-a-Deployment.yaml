@@ -1,0 +1,45 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: microservice-a-deployment-v1
+  labels:
+    app: microservice-a
+    version: "1.0"
+spec:
+  replicas: 1
+  template: # template for the pods
+    metadata:
+      labels:
+        app: microservice-a
+        version: "1.0"
+    spec:
+      containers:
+      - name: microservice-a
+        image: microservice-a:1.0
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+        
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: microservice-a-deployment-v2
+  labels:
+    app: microservice-a
+    version: "2.0"
+spec:
+  replicas: 1
+  template: # template for the pods
+    metadata:
+      labels:
+        app: microservice-a
+        version: "2.0"
+    spec:
+      containers:
+      - name: microservice-a
+        image: microservice-a:2.0
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+

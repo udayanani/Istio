@@ -1,0 +1,30 @@
+# If we want to test different versions of the application based on browser's User Agent, we can setup match rules against the header values.
+
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: microservice-a
+spec:
+  hosts:
+  - microservice-a
+  gateways:
+  - microservice-gateway
+  http:
+  - match:
+    - uri:
+        prefix: /
+      headers:
+        user-agent:
+          regex: ".*Chrome.*"
+    route:
+    - destination:
+        host: microservice-a
+        subset: v2                   # Based on the header, traffic goes to the required destination..Eg: All the chrome URL's go the version v2 of microservice-a. 
+  - match:
+    - uri:
+        prefix: /
+    route:
+    - destination:
+        host: microservice-a
+        subset: v1                   # Other than Chrome, requests go to the version v1 of microservice-a.
+
