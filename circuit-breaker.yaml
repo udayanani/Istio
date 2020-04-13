@@ -1,0 +1,21 @@
+# Destination rule need to be applied on a microservice to which circuit breaking is needed.
+# Circuit breaking allows you to write applications that limit the impact of failures, latency spikes
+# In this Eg., circuit breaker is applied on the microservice-a 
+
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: microservice-a-circuit-breaker     # name can be anything
+spec:
+  host: microservice-a.default.svc.cluster.local   # pointing to the main microservice
+  trafficPolicy:
+    connectionPool:
+      tcp:
+        maxConnections: 1
+      http:
+        http1MaxPendingRequests: 1
+    outlierDetection:
+      consecutiveErrors: 1
+      interval: 1m
+      baseEjectionTime: 10m
+      maxEjectionPercent: 100
