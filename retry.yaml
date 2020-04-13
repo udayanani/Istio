@@ -1,0 +1,16 @@
+# A retry setting specifies the maximum number of times an Envoy proxy attempts to connect to a service if the initial call fails. It is one of the circuit breaker rule.
+
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: microservice-b
+spec:
+  hosts:
+  - microservice-b    # Name of the service that needs to be retried 
+  http:
+  - route:
+    - destination:
+        host: microservice-b
+    retries:
+      attempts: 3
+      perTryTimeout: 2s
