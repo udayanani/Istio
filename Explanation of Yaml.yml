@@ -1,0 +1,374 @@
+### Deploying a Service Mesh:
+
+In order to host the service on kubernetes along with istio support, we need following steps:- (Assuming Istio is already installed)
+
+1.Divide the application into microservices and create the container image of those microservices..
+2.Create deployment and service yaml of those services, deploy these yamls to kubernetes and inject istio into it.
+3.Define an ingress gateway which exposes ports and hosts, and apply it. Find your ingress IP address and port and Use curl to fetch your service.
+Later you can apply routing according to your requirements.
+
+### KUBERNETES DEPLOYMENT 
+
+
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: microservice-a-deployment-v1
+  labels:
+    app: microservice-a
+    version: "1.0"
+spec:
+  replicas: 1
+  template: # template for the pods
+    metadata:
+      labels:
+        app: microservice-a            # used in selector section of service
+        version: "1.0"
+    spec:
+      containers:
+      - name: microservice-a
+        image: microservice-a:1.0
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080         
+        
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: microservice-a-deployment-v2
+  labels:
+    app: microservice-a
+    version: "2.0"
+spec:
+  replicas: 1
+  template: # template for the pods
+    metadata:
+      labels:
+        app: microservice-a
+        version: "2.0"
+    spec:
+      containers:
+      - name: microservice-a
+        image: microservice-a:2.0
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+
+
+
+### KUBERNETES SERVICE
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: microservice-a
+  labels:
+    app: microservice-a
+spec:
+  ports:
+  - port: 80                       
+    targetPort: 8080    
+    name: http
+  selector:
+    app: microservice-a             # Name referes to label section
+    
+    
+    
+### ISTIO INGRESS GATEWAY:
+
+Ingress gateway provides a point of entry to your application. You can bind a VirtualService to the gateway and control the HTTP traffic.
+
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: microservice-gateway    # Name can be anything
+spec:
+  selector:                     # Selector specifies to which service the gateway rules should be applied.
+    istio: ingressgateway
+  servers:
+  - hosts:                      # hosts specify the services to expose. Here it configures load balancers to allow HTTP traffic to any host.
+    - "*"
+    port:                       # Port number specifies which port to expose.
+      number: 80
+      name: http                #Port name can be http/tcp or any relevant 
+      protocol: HTTP
+
+	  
+### Binding the Mainservice to the ingress gateway (It can be microservice-a or microservice-b or microservice-c from where the traffic should route)
+ 
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: microservice-a
+spec:
+  hosts:
+  - "*"
+  gateways:
+  - microservice-gateway
+  http:
+  - match:
+    - uri:
+        prefix: /microservice-a   # Every http://ip:port/microservice-a  request will go to that service.
+    rewrite:
+      uri: /                      # Rewriting the main URI.. This endpoint value depends on the user.
+    route:
+    - destination:                                        # Based on matching URI, the control goes to the required service of the main Microservice,
+        host: microservice-a.default.svc.cluster.local    # default is the namespace or it can be only microservice-a.
+
+---
+
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: microservice-b
+spec:
+  hosts:
+  - "*"
+  gateways:
+  - microservice-gateway
+  http:
+  - match:
+    - uri:
+        prefix: /microservice-b   # The main service that gets traffic from ingress gateway
+    rewrite:
+      uri: /                      # Rewriting the main URI.. This endpoint value depends on the user
+    route:
+    - destination:
+        host: microservice-b.default.svc.cluster.local    # Based on matching URI, the control goes to the required service of the main Microservice, default is the namespace
+---
+
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: microservice-c
+spec:
+  hosts:
+  - "*"
+  gateways:
+  - microservice-gateway
+  http:
+  - match:
+    - uri:
+        prefix: /microservice-c   # The main service that gets traffic from ingress gateway
+    rewrite:
+      uri: /                      # Rewriting the main URI.. This endpoint value depends on the user
+    route:
+    - destination:
+        host: microservice-c.default.svc.cluster.local    # Based on matching URI, the control goes to the required service of the main Microservice, default is the namespace        
+		
+
+        
+        
+### VIRTUAL SERVICES
+
+1.Virtual Service filters the incoming requests and forwards them to relevant service based on the rules(Routing Rules) configured by the user.
+2.Routing rules defined will have matching criteria that are specific to a protocol. It can be based URI,request-header or even randomly.
+3.If criteria is matched during routing then traffic is sent to specific service.
+
+# For routing 100% of the traffic to v1,defined by subset
+
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: microservice-a
+spec:
+  hosts:
+  - microservice-a              # Host maps to service name
+  gateways:
+  - microservice-gateway
+ http:
+  - match:                      # Match block checks for the conditions to be satisfied.
+    - uri:
+        prefix: /microservice-a
+    rewrite:
+      uri: /
+    route:
+    - destination:
+        host: microservice-a 
+        subset: v1                # subset is specified by DestinationRule, which is responsible for post routing operations.
+        
+# Rather than routing 100% of the traffic to v1, you can also configure weights so that you can route x% of traffic to v1, and y% of traffic to v2
+
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: microservice-a
+spec:
+  hosts:
+  - microservice-a
+  gateways:
+  - microservice-gateway
+ http:
+  - match:
+    - uri:
+        prefix: /microservice-a  # Once the match condition is satisfied, 80% of the traffic goes to v1 and 20% of the traffic goes to v2. 
+    rewrite:
+      uri: /
+    route:
+    - destination:
+        host: microservice-a
+        subset: v1
+      weight: 80                # Weight tells the amount of traffic to be routed to  particular service.
+    - destination:
+        host: microservice-a
+        subset: v2
+      weight: 20
+
+NOTE: Same rules applies for microservice-b and microservice-c.
+
+
+
+### DESTINATION RULES
+
+1.Destination Rules are the policies, apply to traffic after Virtual-Service Routing takes place.
+2.They specify rules for sidecar connection pooling, load balancing and outlier detection to detect and expel unhealthy hosts from the load balancing pool.
+3.You need to apply Destination Rules before applying Virtual Services as they tell to which subset of the microservice version the traffic should go.
+
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: microservice-a
+spec:
+  host: microservice-a
+  subsets:
+  - name: v1
+    labels:
+      version: "1.0"          # It depends on the number of deployments a microservice has..
+  - name: v2
+    labels:
+      version: "2.0"
+---
+
+# Circuit breaking allows you to write applications that limit the impact of failures, latency spikes
+# In this Eg., circuit breaker is applied on the microservice-a 
+
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: microservice-a-circuit-breaker     # name can be anything
+spec:
+  host: microservice-a                     # pointing to the main microservice
+  trafficPolicy:                            
+    loadBalancer:
+      simple: LEAST_CONN                   # It specifies requests follow least connection load balancing traffic policy, (It can be ROUND_ROBIN as well)
+    connectionPool:                        # Connection pool settings help in circuit breaking. 
+      tcp:
+        maxConnections: 100                # This rule makes sure that at a time there will be less than 100 connections. I
+        connectTimeout: 30ms               # If connection exceeds istio breaks the connection for 30ms(Service goes down) and comes back again after 30ms.
+      http:
+        http1MaxPendingRequests: 1
+    outlierDetection:                      # Outlier detection tracks the status of each individual service. 
+      consecutiveErrors: 1                 # This specifies the number of errors before the host is removed from the pool 
+      interval: 1m
+      baseEjectionTime: 10m                # It specifies minimum ejection time
+      maxEjectionPercent: 100
+
+NOTE: Same rules applies for microservice-b and microservice-c.
+
+
+
+
+### FAULT INJECTION AND DELAY INJECTION
+
+We can inject different levels of delay and faults into a microservice using a virtual service.
+
+# Injecting faults into the microservices. Eg.,Injecting a 500 response in accessing a particular service.
+
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: microservice-a-fault            # Name can be anything
+spec:
+  hosts:
+  - microservice-a                      # Host specifies the microservice that needs to be injected.
+  http:
+  - fault:                              # fault helps in injecting an error response to a particular service. 
+      abort:
+        percent: 100
+        httpStatus: 500                 # whenever user tries to access the microservice-a, it returns 500 response.
+    route:
+    - destination:
+        host: microservice-a.default.svc.cluster.local 
+---
+
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: microservice-a
+spec:
+  hosts:
+  - microservice-a
+  gateways:
+  - microservice-gateway
+  http:
+  - match:
+    - uri:
+        prefix: /
+    route:
+    - destination:
+        host: microservice-a
+        subset: v1
+    fault:
+      delay:
+        percent: 100
+        fixedDelay: 5s              # Injects the delay by 5s.
+
+
+        
+
+### RETRIES
+
+1.A retry setting specifies the maximum number of times an Envoy proxy attempts to connect to a service if the initial call fails.
+2.It is one of the circuit breaker rule.
+
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: microservice-b
+spec:
+  hosts:
+  - microservice-b          # Name of the service that needs to be retried 
+  http:
+  - route:
+    - destination:
+        host: microservice-b
+    retries:
+      attempts: 3           # Makes 3 attempts in accessing the service for 2s each
+      perTryTimeout: 2s
+      
+
+      
+### ROUTE HEADERS
+
+If we want to test different versions of the application based on browser's User Agent, we can setup match rules against the header values.
+
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: microservice-a
+spec:
+  hosts:
+  - microservice-a
+  gateways:
+  - microservice-gateway
+  http:
+  - match:
+    - uri:
+        prefix: /
+      headers:
+        user-agent:
+          regex: "*.Chrome.*"       # Matches all the headers with *.Chrome.* and route accordingle.
+    route:
+    - destination:
+        host: microservice-a
+        subset: v2                   # Based on the header, traffic goes to the required destination..Eg: All the chrome URL's go the version v2 of microservice-a. 
+  - match:
+    - uri:
+        prefix: /
+    route:
+    - destination:
+        host: microservice-a
+        subset: v1                   # Other than Chrome, requests go to the version v1 of microservice-a.
+
+
